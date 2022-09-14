@@ -3,6 +3,7 @@ from delta.tables import *
 import pyspark.sql.functions as f
 from pyspark.sql.types import *
 from datetime import *
+from delta import *
 
 
 class TypeIUpdate:
@@ -21,6 +22,11 @@ class TypeIUpdate:
         self.last_modification_datetime = last_modification_datetime
 
         try:
-            spark.read.format('delta').load(self.base_table_path )
-        except error as e:
-            return e
+            spark.read.format('delta').load(self.base_table_path)
+        except Exception as e:
+            if "Path does not exist" in str(e):
+                print(1)
+            elif "is not a Delta table." in str(e):
+                print(2)
+            else:
+                raise e
