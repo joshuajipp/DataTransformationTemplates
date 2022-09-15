@@ -12,7 +12,8 @@ builder = SparkSession.builder.appName("MyApp") \
 
 spark = configure_spark_with_delta_pip(builder).getOrCreate()
 
-df = spark.createDataFrame([(1,"Ricky",30),(4,"Josh",19),(7,"Mizy",20)],['ID','Name','Age'])
+df = spark.createDataFrame(
+    [(1, "Ricky", 30), (4, "Josh", 19), (7, "Mizy", 20)], ['ID', 'Name', 'Age'])
 
-type1 = TypeIUpdate(spark, "./DeltaTableTypeI.csv", df, "ID", datetime.now(timezone.utc))
-
+type1 = TypeIUpdate(spark, "./DeltaTableTypeI", df, "ID",
+                    datetime.now(timezone.utc)).typeIMerge()

@@ -1,20 +1,15 @@
-from distutils.log import error
+from delta import *
 from delta.tables import *
 import pyspark.sql.functions as f
 from pyspark.sql.types import *
 from datetime import *
-from delta import *
 
 
 class TypeIUpdate:
+    global AUDIT_COLUMNS
+    AUDIT_COLUMNS = ['__business_key_hash']
 
-    def __init__(self,
-    spark,
-    base_table_path: str,
-    updates_dataframe,
-    business_key_columns: list,
-    last_modification_datetime: datetime
-    ):
+    def __init__(self, spark: object, base_table_path: str, updates_dataframe, business_key_columns: list, last_modification_datetime: datetime) -> None:
         self.spark = spark
         self.base_table_path = base_table_path
         self.updates_dataframe = updates_dataframe
@@ -23,10 +18,36 @@ class TypeIUpdate:
 
         try:
             spark.read.format('delta').load(self.base_table_path)
+
         except Exception as e:
-            if "Path does not exist" in str(e):
-                print(1)
-            elif "is not a Delta table." in str(e):
-                print(2)
+            if "is not a Delta table." in str(e):
+                raise ("The path you provided is not a Delta table. Please enter a valid path to a Delta table or a valid empty path to create a new Delta table.")
+            elif "Path does not exist" in str(e):
+                (self.spark.createDataFrame([], self.updates_dataframe.schema)
+                 .withColumn('__business_key_hash', f.lit(None))
+                 .write.format('delta').save(self.base_table_path))
+
             else:
-                raise e
+                raise (e)
+
+        assert sorted([x for x in (spark.read.format('delta').load(
+            self.base_table_path).columns) if not x in AUDIT_COLUMNS]) == sorted(self.updates_dataframe.columns)
+
+        self.delta_table = DeltaTable.forPath(self.spark, self.base_table_path)
+
+    def _addAuditColumns(self):
+
+        (self.updates_dataframe.withColumn('__business_key_hash',
+         f.sha2(f.concat_ws("|", self.business_key_columns), 256)))
+
+    def typeIMerge(self):
+        self._addAuditColumns()
+
+        (self.delta_table.alias('base')
+         .merge(
+            self.updates_dataframe.alias('updates'),
+            'base.__business_key_hash = updates.__business_key_hash'
+        )
+            .whenMatchedUpdateAll()
+            .whenNotMatchedInsertAll()
+            .execute())
