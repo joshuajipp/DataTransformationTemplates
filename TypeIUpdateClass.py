@@ -6,8 +6,6 @@ from datetime import *
 
 
 class TypeIUpdate:
-    global AUDIT_COLUMNS
-    AUDIT_COLUMNS = ['__business_key_hash']
 
     def __init__(self, spark: object, base_table_path: str, updates_dataframe, business_key_columns: list, last_modification_datetime: datetime) -> None:
         self.spark = spark
@@ -15,6 +13,7 @@ class TypeIUpdate:
         self.updates_dataframe = updates_dataframe
         self.business_key_columns = business_key_columns
         self.last_modification_datetime = last_modification_datetime
+        self.audit_columns = ['__business_key_hash']
 
         try:
             spark.read.format('delta').load(self.base_table_path)
@@ -31,7 +30,7 @@ class TypeIUpdate:
                 raise (e)
 
         assert sorted([x for x in (spark.read.format('delta').load(
-            self.base_table_path).columns) if not x in AUDIT_COLUMNS]) == sorted(self.updates_dataframe.columns)
+            self.base_table_path).columns) if not x in self.audit_columns]) == sorted(self.updates_dataframe.columns)
 
         self.delta_table = DeltaTable.forPath(self.spark, self.base_table_path)
 
